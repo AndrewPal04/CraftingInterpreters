@@ -30,14 +30,27 @@ class Parser {
     // CHALLENGE 1: Comma operator
     // comma → equality ( "," equality )* ;
     private Expr comma() {
-        Expr expr = equality();
+        Expr expr = ternary();
 
         while (match(COMMA)) {
             Token operator = previous();
-            Expr right = equality();
+            Expr right = ternary();
             expr = new Expr.Comma(expr, right);
         }
 
+        return expr;
+    }
+
+    // ternary → equality ( "?" expression ":" ternary )? ;
+    private Expr ternary() {
+        Expr expr = equality();
+
+        if (match(QUESTION)){
+            Expr thenBranch = expression();
+            consume(COLON, "Expect ':' after then branch of conditional expression.");
+            Expr elseBranch = expression();
+            expr = new Expr.Conditional(expr, thenBranch, elseBranch);
+        }
         return expr;
     }
 
