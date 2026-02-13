@@ -56,53 +56,77 @@ class Parser {
 
     // equality → comparison ( ( "!=" | "==" ) comparison )* ;
     private Expr equality() {
+        // Chapter 6 challenge 3: Error production for binary operators without left operand
+        if (match(BANG_EQUAL, EQUAL_EQUAL)){
+            Token operator = previous();
+            error(operator, "Expect expression before '" + operator.lexeme + "'.");
+            comparison();
+            return new Expr.Literal(null);
+        }
         Expr expr = comparison();
 
-        while (match(BANG_EQUAL, EQUAL_EQUAL)) {
+        while (match(BANG_EQUAL, EQUAL_EQUAL)){
             Token operator = previous();
             Expr right = comparison();
             expr = new Expr.Binary(expr, operator, right);
         }
-
         return expr;
     }
 
     // comparison → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
     private Expr comparison() {
+        // Chapter 6 challenge 3: Error production
+        if (match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)){
+            Token operator = previous();
+            error(operator, "Expect expression before '" + operator.lexeme + "'.");
+            term();
+            return new Expr.Literal(null);
+        }
         Expr expr = term();
 
-        while (match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)) {
+        while (match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)){
             Token operator = previous();
             Expr right = term();
             expr = new Expr.Binary(expr, operator, right);
         }
-
         return expr;
     }
 
     // term → factor ( ( "-" | "+" ) factor )* ;
     private Expr term() {
+        // Chapter 6 challenge 3: error production
+        if (match(PLUS)){
+            Token operator = previous();
+            error(operator, "Expect expression before '" + operator.lexeme + "'.");
+            factor();
+            return new Expr.Literal(null);
+        }
         Expr expr = factor();
 
-        while (match(MINUS, PLUS)) {
+        while (match(MINUS, PLUS)){
             Token operator = previous();
             Expr right = factor();
             expr = new Expr.Binary(expr, operator, right);
         }
-
         return expr;
     }
 
     // factor → unary ( ( "/" | "*" ) unary )* ;
     private Expr factor() {
+        // Chapter 6 challenge 3: error production
+        if (match(SLASH, STAR)){
+            Token operator = previous();
+            error(operator, "Expect expression before '" + operator.lexeme + "'.");
+            unary();
+            return new Expr.Literal(null);
+        }
         Expr expr = unary();
 
-        while (match(SLASH, STAR)) {
+        while (match(SLASH, STAR)){
             Token operator = previous();
             Expr right = unary();
             expr = new Expr.Binary(expr, operator, right);
         }
-
         return expr;
     }
 
