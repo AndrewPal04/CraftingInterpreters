@@ -27,6 +27,10 @@ class AstPrinter implements Expr.Visitor<String> {
         return parenthesize(expr.operator.lexeme, expr.right);
     }
 
+    @Override
+    public String visitCommaExpr(Expr.Comma expr) {
+        return parenthesize("comma", expr.left, expr.right);
+    }
     private String parenthesize(String name, Expr... exprs) {
         StringBuilder builder = new StringBuilder();
 
@@ -41,14 +45,18 @@ class AstPrinter implements Expr.Visitor<String> {
     }
 
     public static void main(String[] args) {
-        Expr expression = new Expr.Binary(
-                new Expr.Unary(
-                        new Token(TokenType.MINUS, "-", null, 1),
-                        new Expr.Literal(123)),
-                new Token(TokenType.STAR, "*", null, 1),
-                new Expr.Grouping(
-                        new Expr.Literal(45.67)));
+        // Test the comma operator
+        // Expression: 1, 2, 3
+        Expr expression = new Expr.Comma(
+                new Expr.Comma(
+                        new Expr.Literal(1),
+                        new Expr.Literal(2)
+                ),
+                new Expr.Literal(3)
+        );
 
         System.out.println(new AstPrinter().print(expression));
+        // Should output: (comma (comma 1.0 2.0) 3.0)
     }
+
 }
