@@ -21,6 +21,7 @@ public class GenerateAst {
                 "Conditional    : Expr condition, Expr thenBranch, Expr elseBranch",
                 "Grouping       : Expr expression",
                 "Literal        : Object value",
+                "Logical        : Expr left, Token operator, Expr right",
                 "Unary          : Token operator, Expr right",
                 "Variable       : Token name"
         ));
