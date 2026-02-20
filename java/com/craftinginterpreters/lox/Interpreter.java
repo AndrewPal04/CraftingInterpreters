@@ -7,6 +7,8 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     //Challenge 2: sentinel value for uninitialized variables
     private static final Object UNINITIALIZED = new Object();
 
+    private static class BreakException extends RuntimeException{}
+
     void interpret(List<Stmt> statements) {
         try {
             for (Stmt statement : statements) {
@@ -33,6 +35,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
     }
     @Override
+    public Void visitBreakStmt(Stmt.Break stmt) {
+        throw new BreakException();
+    }
+    @Override
     public Void visitBlockStmt(Stmt.Block stmt) {
         executeBlock(stmt.statements, new Environment(environment));
         return null;
@@ -55,8 +61,12 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
     @Override
     public Void visitWhileStmt(Stmt.While stmt) {
-        while (isTruthy(evaluate(stmt.condition))) {
-            execute(stmt.body);
+        try {
+            while (isTruthy(evaluate(stmt.condition))) {
+                execute(stmt.body);
+            }
+        } catch (BreakException ex) {
+            // Break caught
         }
         return null;
     }
