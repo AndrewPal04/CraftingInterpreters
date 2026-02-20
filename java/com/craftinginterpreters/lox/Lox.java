@@ -36,13 +36,24 @@ public class Lox {
     private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
+        Interpreter interpreter = new Interpreter();  // CREATE ONCE
 
         for (;;) {
             System.out.print("> ");
             String line = reader.readLine();
             if (line == null) break;
-            run(line);
-            hadError = false;
+
+            Scanner scanner = new Scanner(line);
+            List<Token> tokens = scanner.scanTokens();
+            Parser parser = new Parser(tokens);
+            List<Stmt> statements = parser.parse();
+
+            if (hadError) {
+                hadError = false;
+                continue;
+            }
+
+            interpreter.interpret(statements);
         }
     }
 
@@ -50,14 +61,13 @@ public class Lox {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
         Parser parser = new Parser(tokens);
-        Expr expression = parser.parse();
+        List<Stmt> statements = parser.parse();
 
         // Stop if there was a syntax error.
         if (hadError) return;
 
-        // CHANGED: Use Interpreter instead of AstPrinter
         Interpreter interpreter = new Interpreter();
-        interpreter.interpret(expression);
+        interpreter.interpret(statements);
     }
 
     static void error(int line, String message) {
