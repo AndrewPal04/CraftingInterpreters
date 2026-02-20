@@ -3,6 +3,10 @@ import java.util.List;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     private Environment environment = new Environment();
+
+    //Challenge 2: sentinel value for uninitialized variables
+    private static final Object UNINITIALIZED = new Object();
+
     void interpret(List<Stmt> statements) {
         try {
             for (Stmt statement : statements) {
@@ -42,7 +46,15 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Object visitVariableExpr(Expr.Variable expr) {
-        return environment.get(expr.name);
+        Object value = environment.get(expr.name);
+
+        // CHALLENGE 2: Check for uninitialized variable
+        if (value == UNINITIALIZED) {
+            throw new RuntimeError(expr.name,
+                    "Variable '" + expr.name.lexeme + "' is uninitialized.");
+        }
+
+        return value;
     }
     @Override
     public Object visitLiteralExpr(Expr.Literal expr) {
@@ -148,7 +160,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
     @Override
     public Void visitVarStmt(Stmt.Var stmt) {
-        Object value = null;
+        Object value = UNINITIALIZED;  //Use sentinel instead of null
         if (stmt.initializer != null) {
             value = evaluate(stmt.initializer);
         }
