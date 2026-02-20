@@ -1,6 +1,0 @@
-var a = "global";
-{
-  var a = "local";
-  print a;
-}
-print a;

@@ -36,7 +36,7 @@ public class Lox {
     private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
-        Interpreter interpreter = new Interpreter();  // CREATE ONCE
+        Interpreter interpreter = new Interpreter();
 
         for (;;) {
             System.out.print("> ");
@@ -53,7 +53,14 @@ public class Lox {
                 continue;
             }
 
-            interpreter.interpret(statements);
+            // CHALLENGE 1: If it's a single expression statement, print the result
+            if (statements.size() == 1 && statements.get(0) instanceof Stmt.Expression) {
+                Stmt.Expression exprStmt = (Stmt.Expression) statements.get(0);
+                Object value = interpreter.evaluate(exprStmt.expression);
+                System.out.println(interpreter.stringify(value));
+            } else {
+                interpreter.interpret(statements);
+            }
         }
     }
 
