@@ -13,10 +13,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private static class VariableInfo {
         boolean defined;
         boolean used;
+        int slot;
 
-        VariableInfo(boolean defined, boolean used) {
+        VariableInfo(boolean defined, boolean used, int slot) {
             this.defined = defined;
             this.used = used;
+            this.slot = slot;
         }
     }
     private enum FunctionType {
@@ -55,7 +57,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
             VariableInfo info = entry.getValue();
 
             if (info.defined && !info.used) {
-                Lox.error(0, "Local variable '" + name + "' is declared but never used.");
+                System.err.println("Warning: Local variable '" + name + "' is declared but never used.");
             }
         }
     }
@@ -68,7 +70,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
             Lox.error(name, "Already a variable with this name in this scope.");
         }
 
-        scope.put(name.lexeme, new VariableInfo(false, false));
+        int slot = scope.size();
+        scope.put(name.lexeme, new VariableInfo(false, false, slot));
     }
 
     private void define(Token name) {
@@ -78,7 +81,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private void resolveLocal(Expr expr, Token name) {
         for (int i = scopes.size() - 1; i >= 0; i--) {
             if (scopes.get(i).containsKey(name.lexeme)) {
-                interpreter.resolve(expr, scopes.size() - 1 - i);
+                VariableInfo info = scopes.get(i).get(name.lexeme);
+                interpreter.resolve(expr, scopes.size() - 1 - i, info.slot);
                 return;
             }
         }

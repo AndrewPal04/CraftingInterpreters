@@ -7,10 +7,22 @@ import java.util.HashMap;
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     private final Environment globals = new Environment();
     private Environment environment = globals;
-    private final Map<Expr, Integer> locals = new HashMap<>();
-    void resolve(Expr expr, int depth) {
-        locals.put(expr, depth);
+    private static class Local {
+        final int depth;
+        final int slot;
+
+        Local(int depth, int slot) {
+            this.depth = depth;
+            this.slot = slot;
+        }
     }
+
+    private final Map<Expr, Local> locals = new HashMap<>();
+
+    void resolve(Expr expr, int depth, int slot) {
+        locals.put(expr, new Local(depth, slot));
+    }
+
     //Challenge 2: sentinel value for uninitialized variables
     private static final Object UNINITIALIZED = new Object();
 
@@ -94,9 +106,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     public Object visitAssignExpr(Expr.Assign expr) {
         Object value = evaluate(expr.value);
 
-        Integer distance = locals.get(expr);
-        if (distance != null) {
-            environment.assignAt(distance, expr.name, value);
+        Local local = locals.get(expr);
+        if (local != null) {
+            environment.assignAtSlot(local.depth, local.slot, value);
         } else {
             globals.assign(expr.name, value);
         }
@@ -148,9 +160,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         return value;
     }
     private Object lookUpVariable(Token name, Expr expr) {
-        Integer distance = locals.get(expr);
-        if (distance != null) {
-            return environment.getAt(distance, name.lexeme);
+        Local local = locals.get(expr);
+        if (local != null) {
+            return environment.getAtSlot(local.depth, local.slot);
         } else {
             return globals.get(name);
         }
