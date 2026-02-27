@@ -12,7 +12,7 @@ import java.util.List;
 public class Lox {
     static boolean hadError = false;
     static boolean hadRuntimeError = false;
-
+    private static final Interpreter interpreter = new Interpreter();
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
             System.out.println("Usage: jlox [script]");
@@ -70,10 +70,13 @@ public class Lox {
         Parser parser = new Parser(tokens);
         List<Stmt> statements = parser.parse();
 
-        // Stop if there was a syntax error.
         if (hadError) return;
 
-        Interpreter interpreter = new Interpreter();
+        Resolver resolver = new Resolver(interpreter);
+        resolver.resolve(statements);
+
+        if (hadError) return;
+
         interpreter.interpret(statements);
     }
 
