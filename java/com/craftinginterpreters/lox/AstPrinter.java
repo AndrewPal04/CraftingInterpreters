@@ -5,6 +5,25 @@ class AstPrinter implements Expr.Visitor<String> {
         return expr.accept(this);
     }
     @Override
+    public String visitCallExpr(Expr.Call expr) {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("(call ");
+        builder.append(expr.callee.accept(this));
+
+        for (Expr argument : expr.arguments) {
+            builder.append(" ");
+            builder.append(argument.accept(this));
+        }
+
+        builder.append(")");
+        return builder.toString();
+    }
+    @Override
+    public String visitFunctionExpr(Expr.Function expr) {
+        return "<anonymous fn>";
+    }
+    @Override
     public String visitAssignExpr(Expr.Assign expr) {
         return parenthesize("= " + expr.name.lexeme, expr.value);
     }
