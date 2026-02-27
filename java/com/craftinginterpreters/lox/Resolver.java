@@ -8,7 +8,17 @@ import java.util.List;
 class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private final Interpreter interpreter;
-    private final Stack<Map<String, Boolean>> scopes = new Stack<>();
+    private final Stack<Map<String, VariableInfo>> scopes = new Stack<>();
+
+    private static class VariableInfo {
+        boolean defined;
+        boolean used;
+
+        VariableInfo(boolean defined, boolean used) {
+            this.defined = defined;
+            this.used = used;
+        }
+    }
     private enum FunctionType {
         NONE,
         FUNCTION
@@ -38,24 +48,32 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     private void endScope() {
-        scopes.pop();
+        Map<String, VariableInfo> scope = scopes.pop();
+
+        for (Map.Entry<String, VariableInfo> entry : scope.entrySet()) {
+            String name = entry.getKey();
+            VariableInfo info = entry.getValue();
+
+            if (info.defined && !info.used) {
+                Lox.error(0, "Local variable '" + name + "' is declared but never used.");
+            }
+        }
     }
     private void declare(Token name) {
         if (scopes.isEmpty()) return;
 
-        Map<String, Boolean> scope = scopes.peek();
+        Map<String, VariableInfo> scope = scopes.peek();
 
         if (scope.containsKey(name.lexeme)) {
-            Lox.error(name,
-                    "Already a variable with this name in this scope.");
+            Lox.error(name, "Already a variable with this name in this scope.");
         }
 
-        scope.put(name.lexeme, false);
+        scope.put(name.lexeme, new VariableInfo(false, false));
     }
 
     private void define(Token name) {
         if (scopes.isEmpty()) return;
-        scopes.peek().put(name.lexeme, true);
+        scopes.peek().get(name.lexeme).defined = true;
     }
     private void resolveLocal(Expr expr, Token name) {
         for (int i = scopes.size() - 1; i >= 0; i--) {
@@ -165,13 +183,25 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
     @Override
     public Void visitVariableExpr(Expr.Variable expr) {
-        if (!scopes.isEmpty() &&
-                scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
-            Lox.error(expr.name, "Can't read local variable in its own initializer.");
+        if (!scopes.isEmpty()) {
+            VariableInfo info = scopes.peek().get(expr.name.lexeme);
+            if (info != null && !info.defined) {
+                Lox.error(expr.name, "Can't read local variable in its own initializer.");
+            }
         }
 
         resolveLocal(expr, expr.name);
+        markUsed(expr.name);
         return null;
+    }
+    private void markUsed(Token name) {
+        for (int i = scopes.size() - 1; i >= 0; i--) {
+            VariableInfo info = scopes.get(i).get(name.lexeme);
+            if (info != null) {
+                info.used = true;
+                return;
+            }
+        }
     }
     @Override
     public Void visitAssignExpr(Expr.Assign expr) {
