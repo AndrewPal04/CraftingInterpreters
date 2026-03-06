@@ -13,6 +13,7 @@ abstract class Stmt {
     R visitWhileStmt(While stmt);
     R visitFunctionStmt(Function stmt);
     R visitReturnStmt(Return stmt);
+    R visitClassStmt(Class stmt);
   }
   static class Block extends Stmt {
     Block(List<Stmt> statements) {
@@ -135,6 +136,24 @@ abstract class Stmt {
 
     final Token keyword;
     final Expr value;
+  }
+  static class Class extends Stmt {
+    Class(Token name, Expr.Variable superclass, List<Stmt.Function> methods, List<Stmt.Function> staticMethods) {
+      this.name = name;
+      this.superclass = superclass;
+      this.methods = methods;
+      this.staticMethods = staticMethods;
+    }
+
+    @Override
+    <R> R accept(Visitor<R> visitor) {
+      return visitor.visitClassStmt(this);
+    }
+
+    final Token name;
+    final Expr.Variable superclass;
+    final List<Stmt.Function> methods;
+    final List<Stmt.Function> staticMethods;
   }
 
   abstract <R> R accept(Visitor<R> visitor);

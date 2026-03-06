@@ -1,15 +1,14 @@
 package com.craftinginterpreters.lox;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 class Environment {
     final Environment enclosing;
     private final Map<String, Object> globals = new HashMap<>();
     private final List<Object> values = new ArrayList<>();
-
 
     Environment() {
         enclosing = null;
@@ -28,30 +27,35 @@ class Environment {
     }
 
     Object get(Token name) {
-        if (globals.containsKey(name.lexeme)) {
-            return globals.get(name.lexeme);
+        if (enclosing == null) {
+            if (globals.containsKey(name.lexeme)) {
+                return globals.get(name.lexeme);
+            }
+            throw new RuntimeError(name,
+                    "Undefined variable '" + name.lexeme + "'.");
         }
-
         if (enclosing != null) return enclosing.get(name);
-
         throw new RuntimeError(name,
                 "Undefined variable '" + name.lexeme + "'.");
     }
 
     void assign(Token name, Object value) {
-        if (globals.containsKey(name.lexeme)) {
-            globals.put(name.lexeme, value);
-            return;
+        if (enclosing == null) {
+            if (globals.containsKey(name.lexeme)) {
+                globals.put(name.lexeme, value);
+                return;
+            }
+            throw new RuntimeError(name,
+                    "Undefined variable '" + name.lexeme + "'.");
         }
-
         if (enclosing != null) {
             enclosing.assign(name, value);
             return;
         }
-
         throw new RuntimeError(name,
                 "Undefined variable '" + name.lexeme + "'.");
     }
+
     private Environment ancestor(int distance) {
         Environment environment = this;
         for (int i = 0; i < distance; i++) {
@@ -68,4 +72,12 @@ class Environment {
         ancestor(distance).values.set(slot, value);
     }
 
+    Object getThis() {
+        if (!values.isEmpty()) {
+            Object val = values.get(0);
+            if (val != null) return val;
+        }
+        if (enclosing != null) return enclosing.getThis();
+        return null;
+    }
 }

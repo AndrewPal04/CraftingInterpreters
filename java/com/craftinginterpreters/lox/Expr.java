@@ -15,6 +15,10 @@ abstract class Expr {
     R visitVariableExpr(Variable expr);
     R visitCallExpr(Call expr);
     R visitFunctionExpr(Function expr);
+    R visitGetExpr(Get expr);
+    R visitSetExpr(Set expr);
+    R visitThisExpr(This expr);
+    R visitSuperExpr(Super expr);
   }
   static class Assign extends Expr {
     Assign(Token name, Expr value) {
@@ -171,6 +175,62 @@ abstract class Expr {
 
     final List<Token> params;
     final List<Stmt> body;
+  }
+  static class Get extends Expr {
+    Get(Expr object, Token name) {
+      this.object = object;
+      this.name = name;
+    }
+
+    @Override
+    <R> R accept(Visitor<R> visitor) {
+      return visitor.visitGetExpr(this);
+    }
+
+    final Expr object;
+    final Token name;
+  }
+  static class Set extends Expr {
+    Set(Expr object, Token name, Expr value) {
+      this.object = object;
+      this.name = name;
+      this.value = value;
+    }
+
+    @Override
+    <R> R accept(Visitor<R> visitor) {
+      return visitor.visitSetExpr(this);
+    }
+
+    final Expr object;
+    final Token name;
+    final Expr value;
+  }
+  static class This extends Expr {
+    This(Token keyword) {
+      this.keyword = keyword;
+    }
+
+    @Override
+    <R> R accept(Visitor<R> visitor) {
+      return visitor.visitThisExpr(this);
+    }
+
+    final Token keyword;
+  }
+  static class Super extends Expr {
+    Super(Token keyword, Token method) {
+      this.keyword = keyword;
+      this.method = method;
+    }
+
+    @Override
+    <R> R accept(Visitor<R> visitor) {
+      return visitor.visitSuperExpr(this);
+    }
+
+    final Token keyword;
+    final Token method;
   }
 
   abstract <R> R accept(Visitor<R> visitor);

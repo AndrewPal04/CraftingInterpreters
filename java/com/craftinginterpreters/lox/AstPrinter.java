@@ -40,7 +40,22 @@ class AstPrinter implements Expr.Visitor<String> {
         return parenthesize(expr.operator.lexeme,
                 expr.left, expr.right);
     }
-
+    @Override
+    public String visitGetExpr(Expr.Get expr) {
+        return "(get " + expr.name.lexeme + " " + print(expr.object) + ")";
+    }
+    @Override
+    public String visitSetExpr(Expr.Set expr) {
+        return "(set " + expr.name.lexeme + " " + print(expr.object) + " " + print(expr.value) + ")";
+    }
+    @Override
+    public String visitThisExpr(Expr.This expr) {
+        return "this";
+    }
+    @Override
+    public String visitSuperExpr(Expr.Super expr) {
+        return "(super " + expr.method.lexeme + ")";
+    }
     @Override
     public String visitGroupingExpr(Expr.Grouping expr) {
         return parenthesize("group", expr.expression);

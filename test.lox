@@ -1,10 +1,28 @@
-var a = "global";
-{
-  fun showA() {
-    print a;
-  }
-
-  showA();
-  var a = "block";
-  showA();
+class Animal {
+  init(name) { this.name = name; }
+  speak() { print this.name + " makes a sound."; }
 }
+
+class Dog < Animal {
+  speak() { print this.name + " barks."; }
+}
+
+var d = Dog("Rex");
+d.speak();  // expect: Rex barks.
+
+class Cat < Animal {}
+var c = Cat("Whiskers");
+c.speak();  // expect: Whiskers makes a sound.
+
+// super
+class Shape {
+  area() { return 0; }
+}
+class Circle < Shape {
+  init(r) { this.r = r; }
+  area() { return 3.14159 * this.r * this.r; }
+  describe() { print "area: " + super.area(); }
+}
+var circle = Circle(5);
+print circle.area();    // expect: 78.53975
+circle.describe();      // expect: area: 0
