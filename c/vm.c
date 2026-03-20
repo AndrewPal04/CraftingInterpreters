@@ -5,6 +5,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "vm.h"
+#include "value.h"
 
 VM vm;
 
@@ -63,11 +64,35 @@ static InterpretResult run() {
                 push(constant);
                 break;
             }
-            case OP_ADD:      vm.stackTop[-2] += vm.stackTop[-1]; vm.stackTop--; break;
-            case OP_SUBTRACT: vm.stackTop[-2] -= vm.stackTop[-1]; vm.stackTop--; break;
-            case OP_MULTIPLY: vm.stackTop[-2] *= vm.stackTop[-1]; vm.stackTop--; break;
-            case OP_DIVIDE:   vm.stackTop[-2] /= vm.stackTop[-1]; vm.stackTop--; break;
-            case OP_NEGATE:   vm.stackTop[-1] = -vm.stackTop[-1]; break;
+            case OP_ADD:      AS_NUMBER(vm.stackTop[-2]) += AS_NUMBER(vm.stackTop[-1]); vm.stackTop--; break;
+            case OP_SUBTRACT: AS_NUMBER(vm.stackTop[-2]) -= AS_NUMBER(vm.stackTop[-1]); vm.stackTop--; break;
+            case OP_MULTIPLY: AS_NUMBER(vm.stackTop[-2]) *= AS_NUMBER(vm.stackTop[-1]); vm.stackTop--; break;
+            case OP_DIVIDE:   AS_NUMBER(vm.stackTop[-2]) /= AS_NUMBER(vm.stackTop[-1]); vm.stackTop--; break;
+            case OP_NEGATE:   AS_NUMBER(vm.stackTop[-1]) = -AS_NUMBER(vm.stackTop[-1]); break;
+            case OP_NIL:   push(NIL_VAL); break;
+            case OP_TRUE:  push(BOOL_VAL(true)); break;
+            case OP_FALSE: push(BOOL_VAL(false)); break;
+            case OP_EQUAL: {
+                Value b = pop();
+                Value a = pop();
+                push(BOOL_VAL(valuesEqual(a, b)));
+                break;
+            }
+            case OP_GREATER: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(BOOL_VAL(a > b));
+                break;
+            }
+            case OP_LESS: {
+                double b = AS_NUMBER(pop());
+                double a = AS_NUMBER(pop());
+                push(BOOL_VAL(a < b));
+                break;
+            }
+            case OP_NOT:
+                push(BOOL_VAL(!AS_BOOL(pop())));
+                break;
             case OP_RETURN: {
                 printValue(pop());
                 printf("\n");
