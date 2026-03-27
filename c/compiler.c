@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "compiler.h"
+#include "object.h"
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -156,6 +157,13 @@ static void number() {
     emitConstant(NUMBER_VAL(value));
 }
 
+// string: trims the surrounding quotes (+1 start, -2 length),
+// copies the characters onto the heap, and emits it as a constant.
+static void string() {
+    emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
+                                    parser.previous.length - 2)));
+}
+
 static void unary() {
     TokenType operatorType = parser.previous.type;
     parsePrecedence(PREC_UNARY);
@@ -165,6 +173,7 @@ static void unary() {
         default: return;
     }
 }
+
 static void literal() {
     switch (parser.previous.type) {
         case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -173,6 +182,7 @@ static void literal() {
         default: return;
     }
 }
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN]    = { grouping, NULL,   PREC_NONE },
     [TOKEN_RIGHT_PAREN]   = { NULL,     NULL,   PREC_NONE },
@@ -194,7 +204,7 @@ ParseRule rules[] = {
     [TOKEN_LESS]          = { NULL,     binary, PREC_COMPARISON },
     [TOKEN_LESS_EQUAL]    = { NULL,     binary, PREC_COMPARISON },
     [TOKEN_IDENTIFIER]    = { NULL,     NULL,   PREC_NONE },
-    [TOKEN_STRING]        = { NULL,     NULL,   PREC_NONE },
+    [TOKEN_STRING]        = { string,   NULL,   PREC_NONE },
     [TOKEN_NUMBER]        = { number,   NULL,   PREC_NONE },
     [TOKEN_AND]           = { NULL,     NULL,   PREC_NONE },
     [TOKEN_CLASS]         = { NULL,     NULL,   PREC_NONE },

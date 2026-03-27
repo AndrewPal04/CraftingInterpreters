@@ -4,12 +4,15 @@
 #include "chunk.h"
 #include "value.h"
 
-typedef struct {
+typedef struct Obj Obj;
+
+typedef struct VM {
     Chunk* chunk;
     uint8_t* ip;
     Value* stack;
     Value* stackTop;
     int stackCapacity;
+    Obj* objects;
 } VM;
 
 typedef enum {
