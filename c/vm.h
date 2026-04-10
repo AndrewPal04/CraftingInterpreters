@@ -2,6 +2,7 @@
 #define clox_vm_h
 
 #include "chunk.h"
+#include "table.h"
 #include "value.h"
 
 typedef struct Obj Obj;
@@ -13,6 +14,8 @@ typedef struct VM {
     Value* stackTop;
     int stackCapacity;
     Obj* objects;
+    Table globals;
+    Table strings;
 } VM;
 
 typedef enum {

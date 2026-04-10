@@ -4,6 +4,8 @@
 #include "common.h"
 #include "value.h"
 
+typedef struct VM VM;
+
 typedef enum {
     OBJ_STRING,
 } ObjType;
@@ -17,6 +19,7 @@ struct ObjString {
     Obj obj;
     int length;
     char* chars;
+    uint32_t hash;
 };
 
 #define OBJ_TYPE(value)   (AS_OBJ(value)->type)
