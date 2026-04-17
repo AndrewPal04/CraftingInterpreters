@@ -23,12 +23,19 @@ static int simpleInstruction(const char* name, int offset) {
     return offset + 1;
 }
 
-// byteInstruction: for opcodes that take a single byte operand that is
-// a stack slot index rather than a constant table index (locals).
 static int byteInstruction(const char* name, Chunk* chunk, int offset) {
     uint8_t slot = chunk->code[offset + 1];
     printf("%-16s %4d\n", name, slot);
     return offset + 2;
+}
+
+// jumpInstruction: shows the jump offset and the absolute target address.
+// sign is +1 for forward jumps and -1 for OP_LOOP (backward).
+static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset) {
+    uint16_t jump = (uint16_t)((chunk->code[offset + 1] << 8) |
+                                chunk->code[offset + 2]);
+    printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+    return offset + 3;
 }
 
 static int longConstantInstruction(const char* name, Chunk* chunk, int offset) {
@@ -95,6 +102,12 @@ int disassembleInstruction(Chunk* chunk, int offset) {
             return simpleInstruction("OP_NEGATE", offset);
         case OP_PRINT:
             return simpleInstruction("OP_PRINT", offset);
+        case OP_JUMP:
+            return jumpInstruction("OP_JUMP", 1, chunk, offset);
+        case OP_JUMP_IF_FALSE:
+            return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+        case OP_LOOP:
+            return jumpInstruction("OP_LOOP", -1, chunk, offset);
         case OP_RETURN:
             return simpleInstruction("OP_RETURN", offset);
         default:

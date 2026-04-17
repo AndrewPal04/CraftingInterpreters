@@ -117,6 +117,8 @@ static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
+#define READ_SHORT() \
+    (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -143,8 +145,6 @@ static InterpretResult run() {
             case OP_FALSE: push(BOOL_VAL(false)); break;
             case OP_POP:   pop(); break;
 
-            // Local variables are accessed directly by stack slot index.
-            // No hash lookup needed — the compiler knows the exact slot.
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
                 push(vm.stack[slot]);
@@ -231,6 +231,29 @@ static InterpretResult run() {
                 break;
             }
 
+            // OP_JUMP: unconditional forward jump.
+            case OP_JUMP: {
+                uint16_t offset = READ_SHORT();
+                vm.ip += offset;
+                break;
+            }
+
+            // OP_JUMP_IF_FALSE: peek the condition (don't pop — the caller
+            // emits OP_POP on both branches so it stays balanced).
+            // If falsey, skip over the then-branch.
+            case OP_JUMP_IF_FALSE: {
+                uint16_t offset = READ_SHORT();
+                if (isFalsey(peek(0))) vm.ip += offset;
+                break;
+            }
+
+            // OP_LOOP: unconditional backward jump for while/for loops.
+            case OP_LOOP: {
+                uint16_t offset = READ_SHORT();
+                vm.ip -= offset;
+                break;
+            }
+
             case OP_RETURN: {
                 return INTERPRET_OK;
             }
@@ -240,6 +263,7 @@ static InterpretResult run() {
 #undef READ_BYTE
 #undef READ_CONSTANT
 #undef READ_STRING
+#undef READ_SHORT
 #undef BINARY_OP
 }
 
