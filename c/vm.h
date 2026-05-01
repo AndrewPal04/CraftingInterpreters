@@ -29,6 +29,7 @@ typedef struct VM {
     Obj**        grayStack;
     Table        globals;
     Table        strings;
+    ObjString*   initString;
 } VM;
 
 typedef enum {
