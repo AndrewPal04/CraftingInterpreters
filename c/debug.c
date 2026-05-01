@@ -134,6 +134,12 @@ int disassembleInstruction(Chunk* chunk, int offset) {
             return closureInstruction("OP_CLOSURE", chunk, offset);
         case OP_CLOSE_UPVALUE:
             return simpleInstruction("OP_CLOSE_UPVALUE", offset);
+        case OP_GET_PROPERTY:
+            return constantInstruction("OP_GET_PROPERTY", chunk, offset);
+        case OP_SET_PROPERTY:
+            return constantInstruction("OP_SET_PROPERTY", chunk, offset);
+        case OP_CLASS:
+            return constantInstruction("OP_CLASS", chunk, offset);
         case OP_RETURN:
             return simpleInstruction("OP_RETURN", offset);
         default:

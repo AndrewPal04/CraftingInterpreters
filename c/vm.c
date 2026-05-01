@@ -75,15 +75,42 @@ static bool typeNative(int argCount, Value* args, Value* result) {
         *result = OBJ_VAL(copyString("nil", 3));
     } else if (IS_STRING(value)) {
         *result = OBJ_VAL(copyString("string", 6));
-    } else if (IS_CLOSURE(value)) {
-        *result = OBJ_VAL(copyString("function", 8));
     } else if (IS_CLOSURE(value) || IS_FUNCTION(value)) {
         *result = OBJ_VAL(copyString("function", 8));
     } else if (IS_NATIVE(value)) {
         *result = OBJ_VAL(copyString("native", 6));
+    } else if (IS_CLASS(value)) {
+        *result = OBJ_VAL(copyString("class", 5));
+    } else if (IS_INSTANCE(value)) {
+        *result = OBJ_VAL(copyString("instance", 8));
     } else {
         *result = OBJ_VAL(copyString("unknown", 7));
     }
+    return true;
+}
+
+static bool hasFieldNative(int argCount, Value* args, Value* result) {
+    if (argCount != 2) {
+        return false;
+    }
+    if (!IS_INSTANCE(args[0]) || !IS_STRING(args[1])) {
+        *result = BOOL_VAL(false);
+        return true;
+    }
+    ObjInstance* instance = AS_INSTANCE(args[0]);
+    Value dummy;
+    *result = BOOL_VAL(tableGet(&instance->fields, AS_STRING(args[1]), &dummy));
+    return true;
+}
+
+static bool deleteFieldNative(int argCount, Value* args, Value* result) {
+    if (argCount != 2 || !IS_INSTANCE(args[0]) || !IS_STRING(args[1])) {
+        *result = BOOL_VAL(false);
+        return true;
+    }
+    ObjInstance* instance = AS_INSTANCE(args[0]);
+    bool deleted = tableDelete(&instance->fields, AS_STRING(args[1]));
+    *result = BOOL_VAL(deleted);
     return true;
 }
 
@@ -97,12 +124,19 @@ static void defineNative(const char* name, NativeFn function, int arity) {
 
 void initVM() {
     resetStack();
-    vm.objects = NULL;
+    vm.objects       = NULL;
+    vm.bytesAllocated = 0;
+    vm.nextGC        = 1024 * 1024;
+    vm.grayCount     = 0;
+    vm.grayCapacity  = 0;
+    vm.grayStack     = NULL;
     initTable(&vm.globals);
     initTable(&vm.strings);
-    defineNative("clock", clockNative, 0);
-    defineNative("sqrt",  sqrtNative,  1);
-    defineNative("type",  typeNative,  1);
+    defineNative("clock",       clockNative,       0);
+    defineNative("sqrt",        sqrtNative,        1);
+    defineNative("type",        typeNative,        1);
+    defineNative("hasField",    hasFieldNative,    2);
+    defineNative("deleteField", deleteFieldNative, 2);
 }
 
 void freeVM() {
@@ -141,14 +175,19 @@ static bool call(ObjClosure* closure, int argCount) {
     frame->slots     = vm.stackTop - argCount - 1;
     return true;
 }
+
 static bool callValue(Value callee, int argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+            case OBJ_CLASS: {
+                ObjClass* klass = AS_CLASS(callee);
+                vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+                return true;
+            }
             case OBJ_CLOSURE:
                 return call(AS_CLOSURE(callee), argCount);
             case OBJ_FUNCTION: {
-                ObjFunction* function = AS_FUNCTION(callee);
-                ObjClosure* temp = newClosure(function);
+                ObjClosure* temp = newClosure(AS_FUNCTION(callee));
                 return call(temp, argCount);
             }
             case OBJ_NATIVE: {
@@ -176,25 +215,20 @@ static bool callValue(Value callee, int argCount) {
 static ObjUpvalue* captureUpvalue(Value* local) {
     ObjUpvalue* prevUpvalue = NULL;
     ObjUpvalue* upvalue     = vm.openUpvalues;
-
     while (upvalue != NULL && upvalue->location > local) {
         prevUpvalue = upvalue;
         upvalue     = upvalue->next;
     }
-
     if (upvalue != NULL && upvalue->location == local) {
         return upvalue;
     }
-
     ObjUpvalue* createdUpvalue = newUpvalue(local);
     createdUpvalue->next       = upvalue;
-
     if (prevUpvalue == NULL) {
         vm.openUpvalues = createdUpvalue;
     } else {
         prevUpvalue->next = createdUpvalue;
     }
-
     return createdUpvalue;
 }
 
@@ -213,14 +247,16 @@ static bool isFalsey(Value value) {
 }
 
 static void concatenate() {
-    ObjString* b = AS_STRING(pop());
-    ObjString* a = AS_STRING(pop());
+    ObjString* b = AS_STRING(peek(0));
+    ObjString* a = AS_STRING(peek(1));
     int length   = a->length + b->length;
     char* chars  = ALLOCATE(char, length + 1);
     memcpy(chars, a->chars, a->length);
     memcpy(chars + a->length, b->chars, b->length);
     chars[length] = '\0';
     ObjString* result = takeString(chars, length);
+    pop();
+    pop();
     push(OBJ_VAL(result));
 }
 
@@ -312,6 +348,34 @@ static InterpretResult run() {
             case OP_SET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
                 *frame->closure->upvalues[slot]->location = peek(0);
+                break;
+            }
+            case OP_GET_PROPERTY: {
+                if (!IS_INSTANCE(peek(0))) {
+                    runtimeError("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjInstance* instance = AS_INSTANCE(peek(0));
+                ObjString* name = READ_STRING();
+                Value value;
+                if (tableGet(&instance->fields, name, &value)) {
+                    pop();
+                    push(value);
+                    break;
+                }
+                runtimeError("Undefined property '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            case OP_SET_PROPERTY: {
+                if (!IS_INSTANCE(peek(1))) {
+                    runtimeError("Only instances have fields.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjInstance* instance = AS_INSTANCE(peek(1));
+                tableSet(&instance->fields, READ_STRING(), peek(0));
+                Value value = pop();
+                pop();
+                push(value);
                 break;
             }
             case OP_EQUAL: {
@@ -417,6 +481,9 @@ static InterpretResult run() {
                 ip = frame->ip;
                 break;
             }
+            case OP_CLASS:
+                push(OBJ_VAL(newClass(READ_STRING())));
+                break;
         }
     }
 

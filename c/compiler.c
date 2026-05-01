@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "compiler.h"
+#include "memory.h"
 #include "object.h"
 #include "scanner.h"
 
@@ -273,18 +274,15 @@ static int addUpvalue(Compiler* compiler, uint8_t index, bool isLocal) {
 
 static int resolveUpvalue(Compiler* compiler, Token* name) {
     if (compiler->enclosing == NULL) return -1;
-
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
         compiler->enclosing->locals[local].isCaptured = true;
         return addUpvalue(compiler, (uint8_t)local, true);
     }
-
     int upvalue = resolveUpvalue(compiler->enclosing, name);
     if (upvalue != -1) {
         return addUpvalue(compiler, (uint8_t)upvalue, false);
     }
-
     return -1;
 }
 
@@ -413,6 +411,17 @@ static void call(bool canAssign) {
     emitBytes(OP_CALL, argCount);
 }
 
+static void dot(bool canAssign) {
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    uint8_t name = identifierConstant(&parser.previous);
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitBytes(OP_SET_PROPERTY, name);
+    } else {
+        emitBytes(OP_GET_PROPERTY, name);
+    }
+}
+
 static void grouping(bool canAssign) {
     (void)canAssign;
     expression();
@@ -462,7 +471,7 @@ ParseRule rules[] = {
     [TOKEN_LEFT_BRACE]    = { NULL,     NULL,   PREC_NONE },
     [TOKEN_RIGHT_BRACE]   = { NULL,     NULL,   PREC_NONE },
     [TOKEN_COMMA]         = { NULL,     NULL,   PREC_NONE },
-    [TOKEN_DOT]           = { NULL,     NULL,   PREC_NONE },
+    [TOKEN_DOT]           = { NULL,     dot,    PREC_CALL },
     [TOKEN_MINUS]         = { unary,    binary, PREC_TERM },
     [TOKEN_PLUS]          = { NULL,     binary, PREC_TERM },
     [TOKEN_SEMICOLON]     = { NULL,     NULL,   PREC_NONE },
@@ -569,6 +578,16 @@ static void funDeclaration() {
     defineVariable(global);
 }
 
+static void classDeclaration() {
+    consume(TOKEN_IDENTIFIER, "Expect class name.");
+    uint8_t nameConstant = identifierConstant(&parser.previous);
+    declareVariable();
+    emitBytes(OP_CLASS, nameConstant);
+    defineVariable(nameConstant);
+    consume(TOKEN_LEFT_BRACE,  "Expect '{' before class body.");
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+}
+
 static void printStatement() {
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after value.");
@@ -648,11 +667,9 @@ static void forStatement() {
         loopStart = incrementStart;
         patchJump(bodyJump);
     }
-
     beginScope();
     statement();
     endScope();
-
     emitLoop(loopStart);
     if (exitJump != -1) {
         patchJump(exitJump);
@@ -708,7 +725,9 @@ static void statement() {
 }
 
 static void declaration() {
-    if (match(TOKEN_FUN)) {
+    if (match(TOKEN_CLASS)) {
+        classDeclaration();
+    } else if (match(TOKEN_FUN)) {
         funDeclaration();
     } else if (match(TOKEN_VAR)) {
         varDeclaration();
@@ -733,4 +752,12 @@ ObjFunction* compile(const char* source) {
 
     ObjFunction* function = endCompiler();
     return parser.hadError ? NULL : function;
+}
+
+void markCompilerRoots() {
+    Compiler* compiler = current;
+    while (compiler != NULL) {
+        markObject((Obj*)compiler->function);
+        compiler = compiler->enclosing;
+    }
 }
