@@ -62,10 +62,13 @@ typedef struct {
     ObjClosure* method;
 } ObjBoundMethod;
 
-typedef struct {
+typedef struct ObjClass {
     Obj obj;
     ObjString* name;
     Table methods;
+    Table ownMethods;
+    ObjClosure* initializer;
+    struct ObjClass* superclass;
 } ObjClass;
 
 typedef struct {

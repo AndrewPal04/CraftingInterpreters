@@ -175,8 +175,10 @@ static bool call(ObjClosure* closure, int argCount) {
     frame->closure   = closure;
     frame->ip        = closure->function->chunk.code;
     frame->slots     = vm.stackTop - argCount - 1;
+    frame->klass     = NULL;    // <-- ADD
     return true;
 }
+
 static bool callValue(Value callee, int argCount);
 
 static bool bindMethod(ObjClass* klass, ObjString* name) {
@@ -190,14 +192,28 @@ static bool bindMethod(ObjClass* klass, ObjString* name) {
     push(OBJ_VAL(bound));
     return true;
 }
-
+static bool callMethod(ObjClass* klass, ObjString* name, int argCount) {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        return false;
+    }
+    bool result = call(AS_CLOSURE(method), argCount);
+    if (result) {
+        vm.frames[vm.frameCount - 1].klass = klass;
+    }
+    return result;
+}
 static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
         runtimeError("Undefined property '%s'.", name->chars);
         return false;
     }
-    return call(AS_CLOSURE(method), argCount);
+    bool result = call(AS_CLOSURE(method), argCount);
+    if (result) {
+        vm.frames[vm.frameCount - 1].klass = klass;
+    }
+    return result;
 }
 
 static bool invoke(ObjString* name, int argCount) {
@@ -212,7 +228,27 @@ static bool invoke(ObjString* name, int argCount) {
         vm.stackTop[-argCount - 1] = value;
         return callValue(value, argCount);
     }
-    return invokeFromClass(instance->klass, name, argCount);
+    ObjClass* klass = instance->klass;
+    ObjClass* methodClass = NULL;
+    Value topMethod;
+    ObjClass* cur = klass;
+    while (cur != NULL) {
+        Value m;
+        if (tableGet(&cur->ownMethods, name, &m)) {
+            methodClass = cur;
+            topMethod = m;
+        }
+        cur = cur->superclass;
+    }
+    if (methodClass == NULL) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+    bool result = call(AS_CLOSURE(topMethod), argCount);
+    if (result) {
+        vm.frames[vm.frameCount - 1].klass = methodClass;
+    }
+    return result;
 }
 
 static bool callValue(Value callee, int argCount) {
@@ -226,9 +262,12 @@ static bool callValue(Value callee, int argCount) {
             case OBJ_CLASS: {
                 ObjClass* klass = AS_CLASS(callee);
                 vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
-                Value initializer;
-                if (tableGet(&klass->methods, vm.initString, &initializer)) {
-                    return call(AS_CLOSURE(initializer), argCount);
+                if (klass->initializer != NULL) {
+                    bool result = call(klass->initializer, argCount);
+                    if (result) {
+                        vm.frames[vm.frameCount - 1].klass = klass;
+                    }
+                    return result;
                 } else if (argCount != 0) {
                     runtimeError("Expected 0 arguments but got %d.", argCount);
                     return false;
@@ -325,7 +364,14 @@ static void concatenate() {
 static void defineMethod(ObjString* name) {
     Value method = peek(0);
     ObjClass* klass = AS_CLASS(peek(1));
-    tableSet(&klass->methods, name, method);
+    tableSet(&klass->ownMethods, name, method);
+    Value existing;
+    if (!tableGet(&klass->methods, name, &existing)) {
+        tableSet(&klass->methods, name, method);
+    }
+    if (name == vm.initString) {
+        klass->initializer = AS_CLOSURE(method);
+    }
     pop();
 }
 
@@ -529,6 +575,7 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 ObjClass* subclass = AS_CLASS(peek(0));
+                subclass->superclass = AS_CLASS(superclass);
                 tableAddAll(&AS_CLASS(superclass)->methods, &subclass->methods);
                 pop();
                 break;
@@ -549,6 +596,33 @@ static InterpretResult run() {
                 if (!invokeFromClass(superclass, method, argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
+                frame = &vm.frames[vm.frameCount - 1];
+                ip = frame->ip;
+                break;
+            }
+            case OP_INNER: {
+                CallFrame* curFrame = &vm.frames[vm.frameCount - 1];
+                ObjClass* klass = curFrame->klass;
+                if (klass == NULL) {
+                    runtimeError("Can't call 'inner' outside of a method.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjString* name = curFrame->closure->function->name;
+                Value receiver = curFrame->slots[0];
+                ObjInstance* instance = AS_INSTANCE(receiver);
+                ObjClass* subclass = instance->klass;
+                if (subclass == klass) {
+                    break;
+                }
+                Value method;
+                if (!tableGet(&subclass->ownMethods, name, &method)) {
+                    break;
+                }
+                push(receiver);
+                frame->ip = ip;
+                bool result = call(AS_CLOSURE(method), 0);
+                if (!result) return INTERPRET_RUNTIME_ERROR;
+                vm.frames[vm.frameCount - 1].klass = subclass;
                 frame = &vm.frames[vm.frameCount - 1];
                 ip = frame->ip;
                 break;

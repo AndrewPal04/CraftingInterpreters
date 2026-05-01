@@ -105,6 +105,17 @@ void tableAddAll(Table* from, Table* to) {
         }
     }
 }
+void tableAddAllNew(Table* from, Table* to) {
+    for (int i = 0; i < from->capacity; i++) {
+        Entry* entry = &from->entries[i];
+        if (entry->key != NULL) {
+            Value existing;
+            if (!tableGet(to, entry->key, &existing)) {
+                tableSet(to, entry->key, entry->value);
+            }
+        }
+    }
+}
 void markTable(Table* table) {
     for (int i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];

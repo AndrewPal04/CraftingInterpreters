@@ -13,6 +13,7 @@ typedef struct {
     ObjClosure* closure;
     uint8_t*    ip;
     Value*      slots;
+    ObjClass*   klass;
 } CallFrame;
 
 typedef struct VM {

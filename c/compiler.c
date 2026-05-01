@@ -486,7 +486,16 @@ static void super_(bool canAssign) {
         emitBytes(OP_GET_SUPER, name);
     }
 }
-
+static void inner_(bool canAssign) {
+    (void)canAssign;
+    if (currentClass == NULL) {
+        error("Can't use 'inner' outside of a class.");
+        return;
+    }
+    consume(TOKEN_LEFT_PAREN,  "Expect '(' after 'inner'.");
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after 'inner'.");
+    emitByte(OP_INNER);
+}
 static void this_(bool canAssign) {
     (void)canAssign;
     if (currentClass == NULL) {
@@ -562,6 +571,7 @@ ParseRule rules[] = {
     [TOKEN_WHILE]         = { NULL,     NULL,   PREC_NONE },
     [TOKEN_ERROR]         = { NULL,     NULL,   PREC_NONE },
     [TOKEN_EOF]           = { NULL,     NULL,   PREC_NONE },
+    [TOKEN_INNER]         = { inner_,   NULL,   PREC_NONE },
 };
 
 static ParseRule* getRule(TokenType type) {
